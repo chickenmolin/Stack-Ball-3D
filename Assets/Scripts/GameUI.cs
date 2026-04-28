@@ -5,120 +5,89 @@ using UnityEngine.UI;
 using UnityEngine.EventSystems;
 using UnityEngine.SceneManagement;
 
-public class GameUI : MonoBehaviour
-{
+public class GameUI : MonoBehaviour {
+    // Thanh tiến trình màn chơi
     public Image levelSlider, levelSliderFill;
-    public Image currentLevelImg;
-    public Image nextLevelImg;
+    public Image currentLevelImg, nextLevelImg;
+
+    // Các màn hình UI theo trạng thái game
     public GameObject firstUI, inGameUI, finishUI, gameOverUI;
-    public GameObject allButtons;
-    private bool _buttons;
-    private Material _playerMaterial;
-    public Text currentLevelText, nextLevelText, finishLevelText, gameOverScoreText, gameOverBestText;
+    public GameObject allButtons; // Panel cài đặt ẩn/hiện
+    private bool _buttons;        // Trạng thái panel cài đặt
+
+    public Text currentLevelText, nextLevelText, finishLevelText,
+                gameOverScoreText, gameOverBestText;
+
     private Player _player;
+    private Material _playerMaterial;
+
     public Button soundButton;
     public Sprite soundOnImg, soundOffImg;
 
-    void Awake()
-    {
-        _playerMaterial = FindObjectOfType<Player>().GetComponent<MeshRenderer>().material;
+    void Awake() {
         _player = FindObjectOfType<Player>();
-        levelSlider.color = _playerMaterial.color;
+        _playerMaterial = _player.GetComponent<MeshRenderer>().material;
+
+        // Tô màu UI theo màu nhân vật
+        levelSlider.color     = _playerMaterial.color;
         levelSliderFill.color = _playerMaterial.color + Color.gray;
-        nextLevelImg.color = _playerMaterial.color;
+        nextLevelImg.color    = _playerMaterial.color;
         currentLevelImg.color = _playerMaterial.color;
+
         soundButton.onClick.AddListener(() => SoundManager.instance.SoundOnOff());
     }
 
-    void Start()
-    {
-        currentLevelText.text = FindObjectOfType<LevelSpawner>()._level.ToString();
-        nextLevelText.text = FindObjectOfType<LevelSpawner>()._level + 1 + "";
+    void Start() {
+        int level = FindObjectOfType<LevelSpawner>()._level;
+        currentLevelText.text = level.ToString();
+        nextLevelText.text    = (level + 1).ToString();
     }
 
-    void Update()
-    {
-        UIManagement();
-    }
+    void Update() { UIManagement(); }
 
-    private void UIManagement()
-    {
-        if (_player.playerState == Player.PlayerState.Prepare)
-        {
-            if (SoundManager.instance._soundPlay && soundButton.GetComponent<Image>().sprite != soundOnImg)
-            {
-                soundButton.GetComponent<Image>().sprite = soundOnImg;
-            }
-
-            else if (!SoundManager.instance._soundPlay && soundButton.GetComponent<Image>().sprite != soundOffImg)
-            {
-                soundButton.GetComponent<Image>().sprite = soundOffImg;
-            }
+    private void UIManagement() {
+        // Cập nhật icon sound on/off
+        if (_player.playerState == Player.PlayerState.Prepare) {
+            soundButton.GetComponent<Image>().sprite = SoundManager.instance._soundPlay
+                ? soundOnImg : soundOffImg;
         }
 
-        if (Input.GetMouseButtonDown(0) && !IgnoreUI() && _player.playerState == Player.PlayerState.Prepare)
-        {
+        // Click chuột → bắt đầu game (bỏ qua nếu click trúng UI)
+        if (Input.GetMouseButtonDown(0) && !IgnoreUI() && _player.playerState == Player.PlayerState.Prepare) {
             _player.playerState = Player.PlayerState.Play;
-            firstUI.SetActive(false);
-            inGameUI.SetActive(true);
-            finishUI.SetActive(false);
-            gameOverUI.SetActive(false);
+            firstUI.SetActive(false); inGameUI.SetActive(true);
+            finishUI.SetActive(false); gameOverUI.SetActive(false);
         }
 
-        if (_player.playerState == Player.PlayerState.Finish)
-        {
-            firstUI.SetActive(false);
-            inGameUI.SetActive(false);
-            finishUI.SetActive(true);
-            gameOverUI.SetActive(false);
-
+        // Hoàn thành màn → hiện UI thắng
+        if (_player.playerState == Player.PlayerState.Finish) {
+            firstUI.SetActive(false); inGameUI.SetActive(false);
+            finishUI.SetActive(true); gameOverUI.SetActive(false);
             finishLevelText.text = "Level " + FindObjectOfType<LevelSpawner>()._level;
         }
 
-        if (_player.playerState == Player.PlayerState.Dead)
-        {
-            firstUI.SetActive(false);
-            inGameUI.SetActive(false);
-            finishUI.SetActive(false);
-            gameOverUI.SetActive(true);
-
+        // Chết → hiện UI thua + click để chơi lại
+        if (_player.playerState == Player.PlayerState.Dead) {
+            firstUI.SetActive(false); inGameUI.SetActive(false);
+            finishUI.SetActive(false); gameOverUI.SetActive(true);
             gameOverScoreText.text = ScoreHandler.instance.score.ToString();
-            gameOverBestText.text = PlayerPrefs.GetInt("Highscore").ToString();
-
-            if (Input.GetMouseButtonDown(0))
-            {
+            gameOverBestText.text  = PlayerPrefs.GetInt("Highscore").ToString();
+            if (Input.GetMouseButtonDown(0)) {
                 ScoreHandler.instance.ResetScore();
-                SceneManager.LoadScene(0);
+                SceneManager.LoadScene(0); // Reload màn chơi
             }
         }
     }
 
-    private bool IgnoreUI()
-    {
-        PointerEventData pointerEventData = new PointerEventData(EventSystem.current);
-        pointerEventData.position = Input.mousePosition;
-        List<RaycastResult> raycastResultList = new List<RaycastResult>();
-        EventSystem.current.RaycastAll(pointerEventData, raycastResultList);
-        for (int i = 0; i < raycastResultList.Count; i++)
-        {
-            if (raycastResultList[i].gameObject.GetComponent<IgnoreUI>() != null)
-            {
-                raycastResultList.RemoveAt(i);
-                i--;
-            }
-        }
-
-        return raycastResultList.Count > 0;
+    // Kiểm tra click có trúng UI element không (trừ IgnoreUI tag)
+    private bool IgnoreUI() {
+        PointerEventData eventData = new PointerEventData(EventSystem.current) { position = Input.mousePosition };
+        List<RaycastResult> results = new List<RaycastResult>();
+        EventSystem.current.RaycastAll(eventData, results);
+        results.RemoveAll(r => r.gameObject.GetComponent<IgnoreUI>() != null);
+        return results.Count > 0;
     }
 
-    public void LevelSliderFill(float fillAmount)
-    {
-        levelSlider.fillAmount = fillAmount;
-    }
-
-    public void Settings()
-    {
-        _buttons = !_buttons;
-        allButtons.SetActive(_buttons);
-    }
+    public void LevelSliderFill(float fillAmount) { levelSlider.fillAmount = fillAmount; }
+    public void Settings() { allButtons.SetActive(_buttons = !_buttons); } // Toggle panel cài đặt
 }
